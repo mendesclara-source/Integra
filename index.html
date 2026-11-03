@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Integra+ | Em construção</title>
+  <meta name="description" content="Integra+ — entregamos integrações web para o seu negócio. Site em construção.">
+  <link rel="icon" href="2a09c5247577440dbf138e82f9b47e97.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #141a3a;
+      --blue: #2f7bf5;
+      --teal: #1fa08c;
+      --purple: #7b4df0;
+      --bg: #f3f5fa;
+      --muted: #5b6283;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--navy);
+      background: var(--bg);
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Manchas de cor suaves no fundo, inspiradas nas barras da logo */
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      width: 42vmax;
+      height: 42vmax;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: .28;
+      z-index: -1;
+    }
+    body::before {
+      background: var(--blue);
+      top: -18vmax;
+      left: -14vmax;
+    }
+    body::after {
+      background: var(--purple);
+      bottom: -20vmax;
+      right: -14vmax;
+    }
+
+    /* Canvas da "tinta" que acompanha o mouse */
+    #ink {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+      filter: blur(18px) saturate(1.2);
+      opacity: .75;
+    }
+
+    main, footer { position: relative; z-index: 1; } /* conteúdo sempre acima da tinta */
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 3rem 1.5rem;
+    }
+
+    .logo {
+      width: min(260px, 60vw);
+      height: auto;
+      border-radius: 28px;
+      background: #fff; /* cartão opaco: a tinta passa inteiramente por baixo */
+      box-shadow: 0 18px 40px -18px rgba(20, 26, 58, .35), 0 0 0 1px rgba(20, 26, 58, .05);
+      animation: float 6s ease-in-out infinite;
+    }
+
+    h1 {
+      margin-top: 2rem;
+      font-size: clamp(2rem, 5.5vw, 3.6rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -.02em;
+      max-width: 16ch;
+    }
+    h1 .grad {
+      background: linear-gradient(90deg, var(--blue), var(--teal), var(--purple));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    p.lead {
+      margin-top: 1rem;
+      max-width: 34rem;
+      font-size: clamp(1rem, 2.2vw, 1.15rem);
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
+
+    footer {
+      padding: 1.5rem;
+      text-align: center;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="ink" aria-hidden="true"></canvas>
+
+  <main>
+    <img class="logo" src="2a09c5247577440dbf138e82f9b47e97.jpg" alt="Logo da Integra+">
+
+    <h1>Estamos construindo algo <span class="grad">integrado</span> para você.</h1>
+
+    <p class="lead">
+      A <strong>Integra+</strong> entrega integrações web para o seu negócio,
+      independente do que você precise!
+    </p>
+    <p class="lead">Nosso site chega em breve!</p>
+  </main>
+
+  <footer>
+    &copy; <span id="year">2026</span> Integra+. Todos os direitos reservados.
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    // Efeito de tinta com inércia: um "pincel" acompanha o ponteiro e, quando ele para,
+    // continua deslizando na mesma direção, freando aos poucos (atrito).
+    (() => {
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+      const canvas = document.getElementById("ink");
+      const ctx = canvas.getContext("2d");
+      const colors = [[47, 123, 245], [31, 160, 140], [123, 77, 240]]; // azul, verde-azulado, roxo
+
+      // Ajustes do efeito
+      const FADE = 0.03;           // quanto a mancha some por quadro (maior = some mais rápido)
+      const BRUSH_FRICTION = 0.93; // atrito do pincel depois que o mouse para (maior = desliza mais)
+      const BLOB_FRICTION = 0.95;  // atrito de cada mancha
+      const INHERIT = 0.45;        // quanto do impulso do pincel cada mancha herda
+      const MIN_SPEED = 0.15;      // abaixo disso (px/quadro) o pincel para de soltar tinta
+
+      const blobs = [];
+      // strength: intensidade da tinta solta pelo pincel (1 com o mouse em movimento,
+      // cai junto com a velocidade enquanto ele desliza sozinho, até sumir sem corte)
+      const brush = { x: 0, y: 0, vx: 0, vy: 0, active: false, strength: 1, coastV0: 0 };
+      let lastMove = null, travelled = 0, running = false, movedThisFrame = false;
+
+      function resize() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = innerWidth * dpr;
+        canvas.height = innerHeight * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      // Cor contínua ao longo do caminho percorrido: azul → verde → roxo → azul…
+      function colorAt(t) {
+        const n = colors.length, i = Math.floor(t) % n, f = t - Math.floor(t);
+        const a = colors[i], b = colors[(i + 1) % n];
+        return a.map((v, k) => Math.round(v + (b[k] - v) * f));
+      }
+
+      function start() {
+        if (!running) { running = true; requestAnimationFrame(frame); }
+      }
+
+      function spawn(x, y, size, vx, vy, jitter, strength = 1) {
+        blobs.push({
+          x, y,
+          a: strength,
+          r: size * (0.5 + 0.5 * strength) * (0.7 + Math.random() * 0.6),
+          vx: vx + (Math.random() - 0.5) * jitter,
+          vy: vy + (Math.random() - 0.5) * jitter,
+          life: 1,
+          decay: FADE * (0.8 + Math.random() * 0.4),
+          c: colorAt(travelled / 400),
+        });
+        if (blobs.length > 300) blobs.shift();
+        start();
+      }
+
+      // Solta tinta ao longo de um segmento (sem buracos em movimentos rápidos)
+      function paint(x0, y0, x1, y1) {
+        const dx = x1 - x0, dy = y1 - y0, dist = Math.hypot(dx, dy);
+        travelled += dist;
+        const steps = Math.max(1, Math.min(Math.ceil(dist / 14), 12));
+        const size = 24 + Math.min(Math.hypot(brush.vx, brush.vy), 40) * 0.6;
+        for (let i = 1; i <= steps; i++) {
+          spawn(x0 + dx * i / steps, y0 + dy * i / steps, size,
+                brush.vx * INHERIT, brush.vy * INHERIT, 0.6, brush.strength);
+        }
+      }
+
+      function onMove(e) {
+        const now = performance.now();
+        const x = e.clientX, y = e.clientY;
+        if (lastMove && brush.active) {
+          // Velocidade normalizada para "px por quadro" (~60 fps) e suavizada
+          const dt = Math.max(now - lastMove, 1) / 16.67;
+          const vx = (x - brush.x) / dt, vy = (y - brush.y) / dt;
+          brush.vx = brush.vx * 0.5 + vx * 0.5;
+          brush.vy = brush.vy * 0.5 + vy * 0.5;
+          paint(brush.x, brush.y, x, y);
+        } else {
+          brush.vx = brush.vy = 0;
+          spawn(x, y, 28, 0, 0, 0.6);
+        }
+        brush.x = x; brush.y = y; brush.active = true;
+        lastMove = now;
+        brush.strength = 1; brush.coastV0 = 0;
+        movedThisFrame = true;
+      }
+
+      // Clique / toque: uma "gota" maior que se espalha
+      function onDown(e) {
+        travelled += 200;
+        for (let i = 0; i < 16; i++) spawn(e.clientX, e.clientY, 40 + Math.random() * 30, 0, 0, 6);
+      }
+
+      function frame() {
+        // Sem movimento novo do ponteiro neste quadro: o pincel segue pela inércia
+        if (!movedThisFrame && brush.active) {
+          if (!brush.coastV0) brush.coastV0 = Math.hypot(brush.vx, brush.vy) || 1;
+          brush.vx *= BRUSH_FRICTION;
+          brush.vy *= BRUSH_FRICTION;
+          // Intensidade proporcional à velocidade restante, com curva suave
+          const f = Math.min(Math.hypot(brush.vx, brush.vy) / brush.coastV0, 1);
+          brush.strength = f * f * (3 - 2 * f);
+          if (Math.hypot(brush.vx, brush.vy) > MIN_SPEED && brush.strength > 0.02) {
+            const x = brush.x + brush.vx, y = brush.y + brush.vy;
+            paint(brush.x, brush.y, x, y);
+            brush.x = x; brush.y = y;
+          }
+        }
+        movedThisFrame = false;
+
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+        for (let i = blobs.length - 1; i >= 0; i--) {
+          const b = blobs[i];
+          b.life -= b.decay;
+          if (b.life <= 0) { blobs.splice(i, 1); continue; }
+          b.x += b.vx; b.y += b.vy;
+          b.vx *= BLOB_FRICTION; b.vy *= BLOB_FRICTION;
+          b.r += 0.8; // a tinta se espalha enquanto some
+          const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+          const [r, gr, bl] = b.c;
+          g.addColorStop(0, `rgba(${r},${gr},${bl},${0.6 * b.life * b.a})`);
+          g.addColorStop(1, `rgba(${r},${gr},${bl},0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        const coasting = brush.active && Math.hypot(brush.vx, brush.vy) > MIN_SPEED && brush.strength > 0.02;
+        if (blobs.length || coasting) requestAnimationFrame(frame);
+        else running = false;
+      }
+
+      resize();
+      addEventListener("resize", resize);
+      addEventListener("pointermove", onMove, { passive: true });
+      addEventListener("pointerdown", onDown, { passive: true });
+      // Ao sair da janela o pincel não "salta" até o ponto de reentrada
+      document.documentElement.addEventListener("pointerleave", () => { brush.active = false; lastMove = null; });
+    })();
+  </script>
+</body>
+</html>
